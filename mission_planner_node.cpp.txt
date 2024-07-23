@@ -1,0 +1,76 @@
+#include "mission_planner/mission_planner_node.hpp"
+
+MissionPlanner::MissionPlanner(rclcpp::Node::SharedPtr& node)
+: nh_(node), count_(0)
+{
+  publisher_ = nh_->create_publisher<std_msgs::msg::String>("chatter", 10);
+  timer_ = nh_->create_wall_timer(
+    std::chrono::milliseconds(500),
+    std::bind(&MissionPlanner::timer_callback, this));
+
+  health_subscription_ = nh_->create_subscription<general_msgs::msg::HealthMessage>(
+      "/health_message", 10, std::bind(&MissionPlanner::health_callback, this, std::placeholders::_1));
+  global_publisher_ = nh_->create_publisher<general_msgs::msg::GlobalMessage>("/global_message", 10);
+
+
+}
+
+void MissionPlanner::timer_callback()
+{
+
+  auto global_msg = general_msgs::msg::GlobalMessage();
+
+  for (const auto &pair : sensor_health_messages_) {
+    for (const auto &msg : pair.second) {
+      global_msg.global_health.push_back(msg);
+    }
+  }
+  global_publisher_->publish(global_msg);
+  std::unordered_map<std::string, std::vector<general_msgs::msg::HealthMessage>> sensor_health_messages_;
+}
+
+void MissionPlanner::health_callback(const general_msgs::msg::HealthMessage & msg){
+  auto &messages = sensor_health_messages_[msg.node_id];
+
+  auto it = std::find_if(messages.begin(), messages.end(), 
+                         [&msg](const general_msgs::msg::HealthMessage& existing_msg) {
+                           return existing_msg.health_status_code == msg.health_status_code;
+                         });
+
+  if (it != messages.end()) {
+    *it = msg; 
+  } else {
+    messages.push_back(msg); 
+  }
+
+}
+
+
+// void MissionPlanner::initialize(){
+//   bond_ = std::make_shared<bond::Bond>("/bond_topic", "health_monitor_bond", nh_);
+//   bond_->setBrokenCallback(std::bind(&MissionPlanner::bondZedBroken, this));
+//   // bond_->setFormedCallback(std::bind(&MissionPlanner::bondZedFormed, this));
+//   bond_->start();
+// }
+
+
+
+
+
+
+
+
+int main(int argc, char * argv[])
+{
+  rclcpp::init(argc, argv);
+  rclcpp::executors::SingleThreadedExecutor executor;
+
+  auto node = std::make_shared<rclcpp::Node>("MissionPlanner");
+
+  MissionPlanner mp(node);
+
+  executor.add_node(node);
+  executor.spin();
+  rclcpp::shutdown();
+  return 0;
+}

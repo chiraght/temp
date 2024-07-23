@@ -1,0 +1,37 @@
+#ifndef MISSION_PLANNER_HPP_
+#define MISSION_PLANNER_HPP_
+
+#include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/string.hpp"
+#include "general_msgs/msg/health_message.hpp"
+#include "general_msgs/msg/global_message.hpp"
+#include <bondcpp/bond.hpp>
+
+
+class MissionPlanner
+{
+public:
+  MissionPlanner(rclcpp::Node::SharedPtr& node);
+
+private:
+  void timer_callback();
+  void health_callback(const general_msgs::msg::HealthMessage & msg);
+  
+  void initialize();
+  rclcpp::Node::SharedPtr nh_;
+  rclcpp::Subscription<general_msgs::msg::HealthMessage>::SharedPtr health_subscription_;
+
+  std::unordered_map<std::string, std::vector<general_msgs::msg::HealthMessage>> sensor_health_messages_;
+
+  // bond 
+  std::shared_ptr<bond::Bond> bond_;
+  void bondZedBroken();
+  void bondZedFormed();
+
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr publisher_;
+  rclcpp::Publisher<general_msgs::msg::GlobalMessage>::SharedPtr global_publisher_;
+  rclcpp::TimerBase::SharedPtr timer_;
+  size_t count_;
+};
+
+#endif  // MISSION_PLANNER_HPP_
